@@ -41,3 +41,27 @@ Após a implementação, iremos realizar testes de carga e estresse para avaliar
 - Com o teste de carga vamos avaliar o desempenho dos programas para uma determinada quantidade de requisições com objetivo de coletar dados como o tempo de resposta.
 - Com o teste de estresse vamos avaliar o desempenho das duas implementações e avaliar até que ponto cada uma delas consegue suportar com objetivo de coletar dados como tempo de resposta, limiar de req/s que cada server suporta, etc.
 - Para reprodutibilidade dos testes iremos limitar a quantidade de recursos de hardware disponíveis para os programas e o banco de dados, além de que estes irão executar virtualizados.
+
+## Arquitetura da Solução
+
+### Rest API
+
+A Rest API é responsável por receber as requisições HTTP e inserir os dados em uma fila para serem processados pelo background job.
+
+Deve expor um endpoint para receber uma requisição HTTP com os dados do recurso a ser criado:
+
+``` http
+POST /resources
+Host: localhost:3000
+Content-Type: application/json
+
+{
+  "name": "Resource Name",
+  "description": "Resource Description",
+  "values": [1, 2, 3]
+}
+```
+
+### Background Job
+
+O Background Job é responsável por processar a fila de recursos a serem criados e inserir em Batch no banco de dados.
