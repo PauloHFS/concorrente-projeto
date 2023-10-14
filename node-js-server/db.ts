@@ -21,7 +21,7 @@ const seed = () => {
 };
 
 const client = new Client({
-  host: 'localhost',
+  host: process.env.HOST ?? 'localhost',
   port: 5432,
   database: 'postgres',
   user: 'postgres',
