@@ -29,6 +29,11 @@ func seedDB(conn *pgx.Conn) (pgx.Rows, error) {
 	return rows, err
 }
 
+// 2. Criar um canal para receber os dados do json
+
+// 3. criar uma goroutine para receber os dados do canal e inserir no banco
+// conn.Query(context.Background(), "insert into resources(name, description, values) values($1, $2, $3)", resource.Name, resource.Description, resource.Values)
+
 func main() {
 	conn, err := pgx.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres")
 
@@ -48,6 +53,10 @@ func main() {
 	r := mux.NewRouter()
 
 	r.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
+		// 1.
+		// converter o body para json: https://gowebexamples.com/json/
+		// inserir o json no canal para ser inserido no banco
+		// retornar código 202 Accepted
 		fmt.Fprintf(w, "Hello, you've requested: %s\n", r.URL.Path)
 	}).Methods("POST")
 
