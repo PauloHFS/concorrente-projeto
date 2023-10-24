@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"unicode"
 
 	"github.com/gorilla/mux"
 	"github.com/jackc/pgx/v4/pgxpool"
@@ -19,6 +20,7 @@ type Resource struct {
 	Values      []int  `json:"values"`
 }
 
+//0.Criar um campo de createdAt do tipo date ou type stamp cirado automaticmaente pelo banco
 func seedDB(conn *pgxpool.Pool) error {
 	_, err := conn.Query(context.Background(), `CREATE TABLE IF NOT EXISTS resources (
       id SERIAL PRIMARY KEY,
@@ -30,12 +32,17 @@ func seedDB(conn *pgxpool.Pool) error {
 	return err
 }
 
-// 2. Criar um canal para receber os dados do json
-
-// 3. criar uma goroutine para receber os dados do canal e inserir no banco
-// conn.Query(context.Background(), "insert into resources(name, description, values) values($1, $2, $3)", resource.Name, resource.Description, resource.Values)
 
 func main() {
+//1.Pegar a quantidade de workers como argumento
+	nWorkers := os.Args[1]
+	if _, err := strconv.Atoi(arg); err == nil {
+		fmt.Println("O argumento é um número inteiro.")
+	} else {
+		fmt.Println("O argumento não é um número inteiro.")
+		os.exit(1)
+	}
+//2.Ler os dados do arquivo do dataset e colocar em uma lista
 	conn, err := pgxpool.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres")
 
 	if err != nil {
@@ -50,13 +57,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Unable to seed database: %v\n", err)
 		os.Exit(1)
 	}
-
 	r := mux.NewRouter()
 
-	//⭐⭐
-	resourceChannel := make(chan Resource)
-
-	//⭐⭐⭐
+//3.Atraves de um for criar a quantidade de goroutines equivalente
+//a quantidade de workers que executam o canal de dados de maneira simultanea
 	go func() {
 		for resource := range resourceChannel {
 			_, err := conn.Exec(context.Background(), "INSERT INTO resources (name, description, values) VALUES ($1, $2, $3)", resource.Name, resource.Description, resource.Values)
@@ -67,31 +71,7 @@ func main() {
 		}
 	}()
 
-	r.HandleFunc("/resources", func(w http.ResponseWriter, r *http.Request) {
-		// 1.
-		// converter o body para json: https://gowebexamples.com/json/
-		// inserir o json no canal para ser inserido no banco
-		// retornar código 202 Accepted
+//4.Criar um for que insere os elementos da lista dentro do resourcechannel
+resourceChannel := make(chan Resource)
 
-		//⭐
-		if r.Method != http.MethodPost {
-			http.Error(w, "Método não permitido", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var resource Resource
-		decoder := json.NewDecoder(r.Body)
-		if err := decoder.Decode(&resource); err != nil {
-			http.Error(w, "Falha ao decodificar JSON", http.StatusBadRequest)
-			return
-		}
-
-		resourceChannel <- resource // Insira no canal
-
-		w.WriteHeader(http.StatusAccepted)
-		fmt.Fprintln(w, "Accepted")
-	}).Methods("POST")
-
-	fmt.Printf("Starting server at port 8080\n")
-	log.Fatal(http.ListenAndServe(":8080", r))
 }
