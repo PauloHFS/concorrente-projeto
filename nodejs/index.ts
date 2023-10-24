@@ -9,6 +9,7 @@ type Resource = {
 };
 
 const masterCluster = async () => {
+  let running = true;
   const numWorks = process.argv[2];
 
   if (!numWorks || isNaN(parseInt(numWorks))) {
@@ -17,11 +18,12 @@ const masterCluster = async () => {
   }
 
   cluster.on('exit', (worker, code, signal) => {
+    if (running) return;
     console.log(`Processo filho ${worker.process.pid} morreu. Reiniciando...`);
     cluster.fork();
   });
 
-  const dataset: Resource[] = require('./dataset.json');
+  const dataset: Resource[] = require(process.cwd() + '/dataset.json');
 
   console.log('Dataset loaded with %s rows', dataset.length);
 
@@ -68,9 +70,8 @@ const masterCluster = async () => {
     distributeTask();
   }
 
-  process.on('message', message => {
-    console.log('(MASTER) message:', message);
-  });
+  running = true;
+  cluster.disconnect();
 };
 
 const childCluster = () => {

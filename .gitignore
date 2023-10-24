@@ -3,3 +3,6 @@ node_modules
 apache-jmeter-*
 
 *sqlite3
+
+nodejs/dist/**/*
+dataset.json
