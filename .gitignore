@@ -6,3 +6,4 @@ apache-jmeter-*
 
 nodejs/dist/**/*
 dataset.json
+nodejs/tests/**/*
