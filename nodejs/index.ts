@@ -1,6 +1,6 @@
 import cluster from 'cluster';
 import { once } from 'events';
-import { Database } from 'sqlite3';
+import { Pool } from 'pg';
 
 type Resource = {
   nome: string;
@@ -27,21 +27,20 @@ const masterCluster = async () => {
 
   console.log('Dataset loaded with %s rows', dataset.length);
 
-  const db = new Database('db.sqlite3');
-
-  db.serialize(() => {
-    db.run('DROP TABLE IF EXISTS resources');
-    db.run(
-      `CREATE TABLE IF NOT EXISTS resources (
-      id INTEGER PRIMARY KEY, 
-      nome TEXT NOT NULL, 
-      descricao TEXT NOT NULL, 
-      valores TEXT NOT NULL, 
-      createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL
-    )`
-    );
+  const pool = new Pool({
+    connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres',
   });
-  db.close();
+
+  await pool.query('DROP TABLE IF EXISTS resources');
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS resources (  
+      id SERIAL PRIMARY KEY,
+      nome VARCHAR(255) NOT NULL,
+      descricao TEXT NOT NULL,
+      valores TEXT[] NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )
+  `);
 
   console.log('Starting cluster with %s workers', numWorks);
 
@@ -75,25 +74,29 @@ const masterCluster = async () => {
 };
 
 const childCluster = () => {
-  const db = new Database('db.sqlite3');
+  const pool = new Pool({
+    connectionString: 'postgresql://postgres:postgres@localhost:5432/postgres',
+  });
 
   process.on('message', (message: { type: 'insert'; resource: Resource }) => {
     if (message.type == 'insert') {
       const resource: Resource = message.resource;
-      db.run(
-        `
+      pool
+        .query(
+          `
         INSERT INTO resources (nome, descricao, valores)
-        VALUES (?, ?, ?)
+        VALUES ($1, $2, $3)
         `,
-        [resource.nome, resource.descricao, resource.valores.join(', ')],
-        function (err) {
-          if (err) {
-            console.log(err);
-            return;
-          }
-          console.log('Inserted row with id %s', this.lastID);
-        }
-      );
+          [resource.nome, resource.descricao, resource.valores]
+        )
+        .then(() => {
+          console.log('Inserted %s', resource.nome);
+        })
+        .catch(err => {
+          console.log('Error inserting %s', resource.nome);
+          console.log(err);
+          process.exit(1);
+        });
     }
   });
 
