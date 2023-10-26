@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"strconv"
+	"sync"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 )
@@ -20,14 +21,21 @@ type Resource struct {
 
 // 0.Criar um campo de createdAt do tipo date ou type stamp cirado automaticmaente pelo banco
 func seedDB(conn *pgxpool.Pool) error {
-	_, err := conn.Query(context.Background(), `CREATE TABLE IF NOT EXISTS resources (
+
+	_, err := conn.Query(context.Background(), `DROP TABLE IF EXISTS resources;`)
+
+	if err != nil {
+		return err
+	}
+
+	_, errCreate := conn.Query(context.Background(), `CREATE TABLE IF NOT EXISTS resources (
       id SERIAL PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
       description TEXT NOT NULL,
       values INT[] NOT NULL
     );`)
 
-	return err
+	return errCreate
 }
 
 func main() {
@@ -40,6 +48,11 @@ func main() {
 		os.Exit(1)
 	}
 	nWorkersInt, err := strconv.Atoi(nWorkers)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao converter o argumento para inteiro: %v\n", err)
+		os.Exit(1)
+	}
 
 	//2.Ler os dados do arquivo do dataset e colocar em uma lista
 	file, err := os.Open("dataset.json")
@@ -62,6 +75,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Printf("Leitura do JSON concluida: %d rows \n", len(dataSet))
+
 	//0. área que conecta o database
 	conn, err := pgxpool.Connect(context.Background(), "postgres://postgres:postgres@localhost:5432/postgres")
 
@@ -78,37 +93,43 @@ func main() {
 		os.Exit(1)
 	}
 
-	fmt.Println("conexão com DB concluida")
+	fmt.Println("DB semeado com sucesso!")
 
+	var wg sync.WaitGroup
 	//4.Criar um for que insere os elementos da lista dentro do resourcechannel
 	resourceChannel := make(chan Resource)
 
-	for _, resource := range dataSet {
-		// Envie o objeto 'data' para o 'resourceChannel'
-		resourceChannel <- Resource{
-			ID:          resource.ID,
-			Name:        resource.Name,
-			Description: resource.Description,
-			Values:      resource.Values,
-		}
-	}
-
-	//3.Atraves de um for criar a quantidade de goroutines equivalente
-	//a quantidade de workers que executam o canal de dados de maneira simultanea
 	for i := 0; i < nWorkersInt; i++ {
+		wg.Add(1)
+
 		go func() {
-			fmt.Println("go routine criada")
+			defer wg.Done()
 			for resource := range resourceChannel {
-				fmt.Printf("%v \n", resource)
 				_, err := conn.Exec(context.Background(), "INSERT INTO resources (name, description, values) VALUES ($1, $2, $3)", resource.Name, resource.Description, resource.Values)
 				if err != nil {
-					// Lidar com erros de inserção no banco de dados
-					fmt.Fprintf(os.Stderr, "Erro na inserção no banco de dados: %v\n", err)
 					continue
 				}
-				fmt.Println("Elemento da lista inserido")
 			}
 		}()
 	}
 
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for _, resource := range dataSet {
+			// Envie o objeto 'data' para o 'resourceChannel'
+			resourceChannel <- Resource{
+				ID:          resource.ID,
+				Name:        resource.Name,
+				Description: resource.Description,
+				Values:      resource.Values,
+			}
+		}
+		close(resourceChannel)
+	}()
+
+	//3.Atraves de um for criar a quantidade de goroutines equivalente
+	//a quantidade de workers que executam o canal de dados de maneira simultanea
+	wg.Wait()
+	os.Exit(0)
 }
