@@ -13,9 +13,9 @@ import (
 
 type Resource struct {
 	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Values      []int  `json:"values"`
+	Name        string `json:"nome"`
+	Description string `json:"descricao"`
+	Values      []int  `json:"valores"`
 }
 
 // 0.Criar um campo de createdAt do tipo date ou type stamp cirado automaticmaente pelo banco
@@ -55,17 +55,11 @@ func main() {
 	//2.2 Declare uma fatia para armazenar os elementos do JSON
 	var dataSet []Resource
 
-	for {
-		var resource Resource
-		if err := decoder.Decode(&resource); err == io.EOF {
-			break // Chegou ao final do arquivo
-		} else if err != nil {
-			fmt.Fprintf(os.Stderr, "Erro ao decodificar JSON: %v\n", err)
-			os.Exit(1)
-		}
-
-		// Adicione o objeto 'resource' à fatia 'dataSet'
-		dataSet = append(dataSet, resource)
+	if err := decoder.Decode(&dataSet); err == io.EOF {
+		fmt.Println("Leitura do Json concluida")
+	} else if err != nil {
+		fmt.Fprintf(os.Stderr, "Erro ao decodificar JSON: %v\n", err)
+		os.Exit(1)
 	}
 
 	//0. área que conecta o database
@@ -84,6 +78,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	fmt.Println("conexão com DB concluida")
+
 	//4.Criar um for que insere os elementos da lista dentro do resourcechannel
 	resourceChannel := make(chan Resource)
 
@@ -101,12 +97,16 @@ func main() {
 	//a quantidade de workers que executam o canal de dados de maneira simultanea
 	for i := 0; i < nWorkersInt; i++ {
 		go func() {
+			fmt.Println("go routine criada")
 			for resource := range resourceChannel {
+				fmt.Printf("%v \n", resource)
 				_, err := conn.Exec(context.Background(), "INSERT INTO resources (name, description, values) VALUES ($1, $2, $3)", resource.Name, resource.Description, resource.Values)
 				if err != nil {
 					// Lidar com erros de inserção no banco de dados
 					fmt.Fprintf(os.Stderr, "Erro na inserção no banco de dados: %v\n", err)
+					continue
 				}
+				fmt.Println("Elemento da lista inserido")
 			}
 		}()
 	}
