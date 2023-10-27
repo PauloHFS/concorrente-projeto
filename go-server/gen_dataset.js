@@ -1,5 +1,5 @@
 const PATH = './dataset.json';
-const SIZE = 10000;
+const SIZE = 100000;
 const valoresSize = 4;
 
 const fs = require('fs');

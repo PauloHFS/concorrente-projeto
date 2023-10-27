@@ -30,9 +30,10 @@ func seedDB(conn *pgxpool.Pool) error {
 
 	_, errCreate := conn.Query(context.Background(), `CREATE TABLE IF NOT EXISTS resources (
       id SERIAL PRIMARY KEY,
-      name VARCHAR(255) NOT NULL,
-      description TEXT NOT NULL,
-      values INT[] NOT NULL
+      nome VARCHAR(255) NOT NULL,
+      descricao TEXT NOT NULL,
+      valores INTEGER[] NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
     );`)
 
 	return errCreate
@@ -105,10 +106,12 @@ func main() {
 		go func() {
 			defer wg.Done()
 			for resource := range resourceChannel {
-				_, err := conn.Exec(context.Background(), "INSERT INTO resources (name, description, values) VALUES ($1, $2, $3)", resource.Name, resource.Description, resource.Values)
+				_, err := conn.Exec(context.Background(), "INSERT INTO resources (nome, descricao, valores) VALUES ($1, $2, $3)", resource.Name, resource.Description, resource.Values)
 				if err != nil {
-					continue
+					fmt.Fprintf(os.Stderr, "Unable to insert into database: %v\n", err)
+					os.Exit(1)
 				}
+				fmt.Printf("Inserido com sucesso: %d\n", resource.ID)
 			}
 		}()
 	}

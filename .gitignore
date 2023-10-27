@@ -7,3 +7,7 @@ apache-jmeter-*
 nodejs/dist/**/*
 dataset.json
 nodejs/tests/**/*
+
+go-server/dist/**/*
+go-server/tests/**/*
+concorrente-projeto.exe

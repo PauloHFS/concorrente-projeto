@@ -1,8 +1,7 @@
 yarn build
 node gen_dataset.js
 
-# workers=(1 2 4 6 8 10 12)
-workers=(1 2)
+workers=(1 2 4 6 8 10 12)
 
 for numWorkers in "${workers[@]}"
 do
